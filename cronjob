@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -eo pipefail
+
+{
+  date
+  bash -lc "
+    exec alerterr \
+      --name=minswap -- \
+      flock /tmp/minswap_cronjob.lock \
+        bundle exec ruby main.rb check_min 3
+  "
+} 2>&1 | tee /tmp/minswap_cronjob.log
