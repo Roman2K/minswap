@@ -17,7 +17,7 @@ module Commands
     total, free = `free -m`.
       tap { $?.success? or raise "free -m failed" }.
       split("\n").find { |s| /^Swap:/ === s }.
-      tap { |s| s or raise "Swap line not found" }.
+      tap { |s| s or raise "swap line not found" }.
       split.yield_self { |a| [a.fetch(1), a.fetch(3)] }
     free.to_f / total.to_f
   end
