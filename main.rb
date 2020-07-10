@@ -1,16 +1,20 @@
 require 'utils'
 
 module Commands
+  DOCKER_COMPOSE = ENV.fetch("HOME") + "/code/services2/docker-compose/run"
+  RESTART_SERVICES = %w[radarr sonarr sabnzbd lidarr kibana es]
+
   def self.cmd_check_min(min)
     log = Utils::Log.new
     min = min.to_f / 100
     free = free_swap
     log = log[min: Utils::Fmt.pct(min,1), free: Utils::Fmt.pct(free,1)]
-    if free < min
-      log.error "not enough free swap"
-      exit 1
+    if free >= min
+      log.info "enough free swap"
+      return
     end
-    log.info "enough free swap"
+    log[services: RESTART_SERVICES].warn "low swap, restarting services"
+    system DOCKER_COMPOSE, "restart", *RESTART_SERVICES
   end
 
   def self.free_swap
