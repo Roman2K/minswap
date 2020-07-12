@@ -2,28 +2,36 @@ require 'utils'
 
 module Commands
   DOCKER_COMPOSE = ENV.fetch("HOME") + "/code/services2/docker-compose/run"
-  RESTART_SERVICES = %w[radarr sonarr sabnzbd lidarr kibana es]
+  RESTART_SERVICES = %w[
+    radarr sonarr lidarr hydra jackett sabnzbd kibana es influxdb2
+  ]
 
   def self.cmd_check_min(min)
     log = Utils::Log.new
     min = min.to_f / 100
-    free = free_swap
-    log = log[min: Utils::Fmt.pct(min,1), free: Utils::Fmt.pct(free,1)]
-    if free >= min
-      log.info "enough free swap"
+    free = free_mem
+    log = log[
+      min: Utils::Fmt.pct(min,1),
+      **free.transform_values { Utils::Fmt.pct(_1,1) },
+    ]
+    if free.values.any? { _1 > min }
+      log.info "enough free memory"
       return
     end
     log[services: RESTART_SERVICES].warn "low swap, restarting services"
     system DOCKER_COMPOSE, "restart", *RESTART_SERVICES
   end
 
-  def self.free_swap
-    total, free = `free -m`.
+  def self.free_mem
+    lines = `free -m`.
       tap { $?.success? or raise "free -m failed" }.
-      split("\n").find { |s| /^Swap:/ === s }.
-      tap { |s| s or raise "swap line not found" }.
-      split.yield_self { |a| [a.fetch(1), a.fetch(3)] }
-    free.to_f / total.to_f
+      split("\n")
+    {mem: [/^Mem:/, 6], swap: [/^Swap:/, 3]}.transform_values do |re, free_col|
+      cells = (lines.find { _1 =~ re } or raise "no lines matched #{re}").split
+      total = cells.fetch 1
+      free = cells.fetch free_col
+      free.to_f / total.to_f
+    end
   end
 end
 
